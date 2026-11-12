@@ -21,10 +21,9 @@ st.set_page_config(
 GREEN = "#08783E"
 DARK_GREEN = "#075B32"
 GOLD = "#C6A45B"
-BG = "#F4F7F5"
 
 # ==================================================
-# DESIGN
+# CUSTOM DESIGN
 # ==================================================
 
 st.markdown("""
@@ -300,7 +299,6 @@ def prepare_detail(data):
     else:
         df["Course Key"] = df["Content Name"].str.lower()
 
-    # Keep the highest progress for duplicate learner/course records.
     df = df.sort_values("Progress", ascending=False)
 
     df = df.drop_duplicates(
@@ -405,18 +403,18 @@ with st.sidebar:
 
 
 # ==================================================
-# HEADER AND COMPANY LOGO
+# HEADER - FIXED HTML RENDERING
 # ==================================================
 
 logo_path = Path("AL-Bawani-logo.png")
 
-left, right = st.columns([1.4, 5])
+left, right = st.columns([1.4, 5], vertical_alignment="center")
 
 with left:
     if logo_path.exists():
         st.image(
             str(logo_path),
-            use_container_width=True
+            width=180
         )
     else:
         st.markdown(
@@ -434,11 +432,11 @@ with right:
 
         <div style="font-size:26px;font-weight:800;
         color:#17452F;">
-            Learning & Development Dashboard
+            Learning &amp; Development Dashboard
         </div>
 
         <div style="font-size:13px;color:#829087;">
-            Employee Learning Performance & Training Tracking
+            Employee Learning Performance &amp; Training Tracking
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -474,9 +472,7 @@ if summary_raw is None or detail_raw is None:
     a, b, c = st.columns(3)
 
     a.info("Employee Insights\n\nTrack employee activity.")
-
     b.info("Course Progress\n\nMonitor course completion.")
-
     c.info("Learning Analytics\n\nReview training performance.")
 
     st.stop()
@@ -491,7 +487,6 @@ except ValueError as error:
     st.stop()
 
 
-# Match course details to employees in the summary.
 employee_emails = set(summary["Email"])
 
 detail = detail[
@@ -567,18 +562,9 @@ st.markdown(
 )
 
 total_employees = filtered_summary["Email"].nunique()
-
-total_views = int(
-    filtered_summary["Course Views"].sum()
-)
-
-total_completions = int(
-    filtered_summary["Course Completions"].sum()
-)
-
-total_hours = float(
-    filtered_summary["Learning Hours"].sum()
-)
+total_views = int(filtered_summary["Course Views"].sum())
+total_completions = int(filtered_summary["Course Completions"].sum())
+total_hours = float(filtered_summary["Learning Hours"].sum())
 
 k1, k2, k3, k4 = st.columns(4)
 
@@ -1027,9 +1013,13 @@ with tab5:
         period or date.today().strftime("%b %Y")
     )
 
+    department_lookup = summary.set_index(
+        "Email"
+    )["Department"].to_dict()
+
     current_history["Department"] = (
         current_history["Email"].map(
-            summary.set_index("Email")["Department"].to_dict()
+            department_lookup
         ).fillna("Not Specified")
     )
 
@@ -1118,7 +1108,10 @@ with tab5:
         )
 
         period_summary["Average_Progress"] = (
-            period_summary["Average_Progress"].round(1)
+            pd.to_numeric(
+                period_summary["Average_Progress"],
+                errors="coerce"
+            ).round(1)
         )
 
         st.markdown("### Period Comparison")
@@ -1168,7 +1161,10 @@ with tab5:
         st.markdown("### Employee History")
 
         employee_options = sorted(
-            combined_history["Name"].dropna().astype(str).unique()
+            combined_history["Name"]
+            .dropna()
+            .astype(str)
+            .unique()
         )
 
         selected_history_employee = st.selectbox(
@@ -1220,4 +1216,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
