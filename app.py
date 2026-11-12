@@ -1,13 +1,16 @@
 
-import streamlit as st
+import io
+from pathlib import Path
+from datetime import date
+
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime
+import streamlit as st
 
-# --------------------------------------------------
-# PAGE CONFIG
-# --------------------------------------------------
+# ==================================================
+# AL BAWANI | LEARNING & DEVELOPMENT
+# ==================================================
+
 st.set_page_config(
     page_title="Al Bawani | Learning Hub",
     page_icon="📚",
@@ -15,14 +18,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-GREEN = "#007834"
-DARK = "#17452F"
+GREEN = "#08783E"
+DARK_GREEN = "#075B32"
 GOLD = "#C6A45B"
 BG = "#F4F7F5"
 
-# --------------------------------------------------
-# CUSTOM DESIGN
-# --------------------------------------------------
+# ==================================================
+# DESIGN
+# ==================================================
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -33,25 +37,26 @@ html, body, [class*="css"] {
 
 .stApp {
     background: #F4F7F5;
+    color: #20352A;
 }
 
 [data-testid="stSidebar"] {
-    background: #FFFFFF;
+    background: white;
     border-right: 1px solid #E4EBE6;
 }
 
 [data-testid="stMetric"] {
     background: white;
     padding: 20px;
-    border-radius: 14px;
-    border: 1px solid #E5ECE7;
-    box-shadow: 0 4px 14px rgba(20,60,40,.04);
+    border-radius: 15px;
+    border: 1px solid #E4ECE6;
+    box-shadow: 0 4px 16px rgba(20,60,40,.05);
     transition: all .25s ease;
 }
 
 [data-testid="stMetric"]:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 22px rgba(0,120,52,.12);
+    box-shadow: 0 9px 22px rgba(8,120,62,.12);
 }
 
 [data-testid="stMetricLabel"] {
@@ -60,32 +65,19 @@ html, body, [class*="css"] {
 }
 
 [data-testid="stMetricValue"] {
-    color: #17452F;
+    color: #075B32;
     font-weight: 800;
 }
 
 .hero {
-    background: linear-gradient(115deg, #075B32, #007834 65%, #26965A);
+    background: linear-gradient(115deg,#064D2B,#08783E,#2A9B60);
     padding: 34px;
     border-radius: 20px;
     color: white;
-    margin-bottom: 24px;
+    margin: 15px 0 25px;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 10px 28px rgba(0,120,52,.16);
-}
-
-.hero:after {
-    content: "";
-    position: absolute;
-    width: 260px;
-    height: 260px;
-    border: 1px solid rgba(255,255,255,.16);
-    border-radius: 50%;
-    right: -65px;
-    top: -110px;
-    box-shadow: 0 0 0 35px rgba(255,255,255,.035),
-                0 0 0 70px rgba(255,255,255,.025);
+    box-shadow: 0 10px 28px rgba(8,120,62,.16);
 }
 
 .hero h1 {
@@ -96,170 +88,294 @@ html, body, [class*="css"] {
 }
 
 .hero p {
-    color: #E3F3E9;
-    margin: 8px 0 0 0;
+    color: #E5F3EA;
+    margin-top: 10px;
 }
 
 .section-title {
     color: #17452F;
-    font-size: 19px;
+    font-size: 20px;
     font-weight: 750;
-    margin: 22px 0 12px 0;
+    margin: 20px 0 12px;
 }
 
-.info-card {
-    background: white;
-    border: 1px solid #E5ECE7;
-    border-radius: 14px;
-    padding: 18px;
-    min-height: 115px;
-}
-
-.status-pill {
-    display: inline-block;
-    border-radius: 30px;
-    padding: 5px 12px;
-    font-size: 12px;
-    font-weight: 700;
-    background: #E7F4EC;
-    color: #08743A;
-}
-
-.stButton button {
+.stButton button,
+.stDownloadButton button {
     border-radius: 9px;
-    font-weight: 600;
+    font-weight: 650;
     transition: all .2s ease;
 }
 
-.stButton button:hover {
-    border-color: #007834;
+.stButton button:hover,
+.stDownloadButton button:hover {
     transform: translateY(-2px);
+    border-color: #08783E;
 }
 
 div[data-testid="stTabs"] button {
     font-weight: 650;
 }
 
-footer {
-    visibility: hidden;
-}
-
-#MainMenu {
+#MainMenu, footer {
     visibility: hidden;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# --------------------------------------------------
-# HELPERS
-# --------------------------------------------------
-def read_csv(upload):
-    if upload is None:
+
+# ==================================================
+# DATA FUNCTIONS
+# ==================================================
+
+def read_report(file):
+    if file is None:
         return None
+
+    raw = file.getvalue()
+    name = file.name.lower()
+
     try:
-        return pd.read_csv(upload)
-    except Exception:
-        try:
-            upload.seek(0)
-            return pd.read_csv(upload, encoding="latin1")
-        except Exception:
-            return None
+        if name.endswith(".csv"):
+            try:
+                return pd.read_csv(
+                    io.BytesIO(raw),
+                    encoding="utf-8-sig"
+                )
+            except UnicodeDecodeError:
+                return pd.read_csv(
+                    io.BytesIO(raw),
+                    encoding="latin1"
+                )
+
+        if name.endswith((".xlsx", ".xls")):
+            return pd.read_excel(
+                io.BytesIO(raw),
+                sheet_name=0
+            )
+
+    except Exception as error:
+        st.error(f"Could not read {file.name}: {error}")
+
+    return None
 
 
-def duration_to_hours(value):
+def clean_text(series):
+    return series.fillna("").astype(str).str.strip()
+
+
+def parse_progress(series):
+    values = (
+        series.fillna("0")
+        .astype(str)
+        .str.replace("%", "", regex=False)
+        .str.replace(",", ".", regex=False)
+    )
+
+    return pd.to_numeric(
+        values,
+        errors="coerce"
+    ).fillna(0).clip(0, 100)
+
+
+def parse_hours(value):
+    if pd.isna(value):
+        return 0.0
+
     try:
-        return pd.to_timedelta(str(value)).total_seconds() / 3600
-    except Exception:
-        return 0
+        parts = str(value).strip().split(":")
+
+        if len(parts) == 3:
+            hours, minutes, seconds = map(float, parts)
+            return hours + minutes / 60 + seconds / 3600
+
+        if len(parts) == 2:
+            minutes, seconds = map(float, parts)
+            return minutes / 60 + seconds / 3600
+
+        return float(value)
+
+    except (ValueError, TypeError):
+        return 0.0
 
 
-def prepare_detail(df):
-    df = df.copy()
+def get_status(progress):
+    if progress >= 100:
+        return "Completed"
+    elif progress > 0:
+        return "In Progress"
+    return "Not Started"
 
-    if "Percent Completed" in df.columns:
-        df["Progress"] = (
-            df["Percent Completed"]
-            .astype(str)
-            .str.replace("%", "", regex=False)
+
+def prepare_summary(data):
+    df = data.copy()
+
+    required = ["Name", "Email"]
+    missing = [c for c in required if c not in df.columns]
+
+    if missing:
+        raise ValueError(
+            "Learner Summary is missing: " + ", ".join(missing)
         )
-        df["Progress"] = pd.to_numeric(
-            df["Progress"], errors="coerce"
-        ).fillna(0).clip(0, 100)
+
+    df["Name"] = clean_text(df["Name"])
+    df["Email"] = clean_text(df["Email"]).str.lower()
+
+    department_col = next(
+        (c for c in df.columns if c.lower() == "department"),
+        None
+    )
+
+    if department_col:
+        df["Department"] = clean_text(df[department_col])
     else:
-        df["Progress"] = 0
+        df["Department"] = "Not Specified"
+
+    df["Department"] = df["Department"].replace(
+        "", "Not Specified"
+    )
+
+    for col in [
+        "Days Logged In",
+        "Course Views",
+        "Course Completions"
+    ]:
+        if col not in df.columns:
+            df[col] = 0
+
+        df[col] = pd.to_numeric(
+            df[col], errors="coerce"
+        ).fillna(0)
+
+    if "Hours Viewed" in df.columns:
+        df["Learning Hours"] = (
+            df["Hours Viewed"].apply(parse_hours)
+        )
+    else:
+        df["Learning Hours"] = 0.0
+
+    df = df.drop_duplicates(
+        subset=["Email"],
+        keep="last"
+    )
+
+    return df
+
+
+def prepare_detail(data):
+    df = data.copy()
+
+    required = ["Name", "Email", "Content Name"]
+    missing = [c for c in required if c not in df.columns]
+
+    if missing:
+        raise ValueError(
+            "Learner Detail is missing: " + ", ".join(missing)
+        )
+
+    df["Name"] = clean_text(df["Name"])
+    df["Email"] = clean_text(df["Email"]).str.lower()
+    df["Content Name"] = clean_text(df["Content Name"])
 
     if "Content Type" in df.columns:
         df = df[
             df["Content Type"].astype(str).str.lower() == "course"
         ].copy()
 
-    df["Status"] = "Not Started"
-    df.loc[df["Progress"] > 0, "Status"] = "In Progress"
-    df.loc[df["Progress"] >= 100, "Status"] = "Completed"
+    if "Percent Completed" in df.columns:
+        df["Progress"] = parse_progress(
+            df["Percent Completed"]
+        )
+    else:
+        df["Progress"] = 0
+
+    df["Status"] = df["Progress"].apply(get_status)
+
+    if "Content ID" in df.columns:
+        content_id = clean_text(df["Content ID"])
+
+        df["Course Key"] = content_id.where(
+            content_id != "",
+            df["Content Name"].str.lower()
+        )
+    else:
+        df["Course Key"] = df["Content Name"].str.lower()
+
+    # Keep the highest progress for duplicate learner/course records.
+    df = df.sort_values("Progress", ascending=False)
+
+    df = df.drop_duplicates(
+        subset=["Email", "Course Key"],
+        keep="first"
+    )
 
     return df
 
 
-def metric_card(label, value, help_text=None):
-    st.metric(label, value, help=help_text)
+def csv_download(data):
+    return data.to_csv(
+        index=False
+    ).encode("utf-8-sig")
 
 
-# --------------------------------------------------
+# ==================================================
 # SIDEBAR
-# --------------------------------------------------
+# ==================================================
+
 with st.sidebar:
 
     st.markdown(
         f"""
-        <div style="text-align:center;padding:12px 0 22px;">
-            <div style="font-size:25px;font-weight:850;color:{GREEN};">
-                AL BAWANI
-            </div>
-            <div style="font-size:11px;letter-spacing:2px;color:#84928A;">
+        <div style="text-align:center;padding:10px;">
+            <h2 style="color:{GREEN};margin-bottom:0;">
                 LEARNING HUB
-            </div>
+            </h2>
+            <small style="letter-spacing:2px;color:#84928A;">
+                AL BAWANI
+            </small>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    st.markdown("---")
-    st.markdown("### Data Center")
+    st.divider()
+
+    st.markdown("### LinkedIn Learning Reports")
 
     summary_file = st.file_uploader(
         "Learner Summary",
-        type=["csv"],
+        type=["csv", "xlsx", "xls"],
         key="summary"
     )
 
     detail_file = st.file_uploader(
         "Learner Detail",
-        type=["csv"],
+        type=["csv", "xlsx", "xls"],
         key="detail"
     )
 
     group_file = st.file_uploader(
         "Group Summary (Optional)",
-        type=["csv"],
+        type=["csv", "xlsx", "xls"],
         key="group"
     )
 
     recommendation_file = st.file_uploader(
         "Recommendation Summary (Optional)",
-        type=["csv"],
-        key="recommendations"
+        type=["csv", "xlsx", "xls"],
+        key="recommendation"
     )
 
-    st.markdown("---")
-    st.markdown("### Brand Identity")
+    st.divider()
 
-    logo_file = st.file_uploader(
-        "Upload Al Bawani Logo",
-        type=["png", "jpg", "jpeg"],
-        key="logo"
-    )
+    st.markdown("### Reporting Period")
 
-    st.markdown("---")
+    period = st.text_input(
+        "Report Month",
+        value=date.today().strftime("%b %Y")
+    ).strip()
+
+    st.divider()
+
     st.markdown("### Mandatory Courses")
 
     mandatory_courses = []
@@ -267,248 +383,254 @@ with st.sidebar:
     for i in range(1, 4):
         course = st.text_input(
             f"Mandatory Course {i}",
-            placeholder="Enter official course title",
-            key=f"mandatory_{i}"
+            placeholder="Enter official course name",
+            key=f"course_{i}"
         )
         mandatory_courses.append(course.strip())
 
-    st.markdown("---")
-    st.caption("Al Bawani | Learning & Development")
+    st.divider()
+
+    st.markdown("### Historical Archive")
+
+    archive_file = st.file_uploader(
+        "Previous Tracking Archive",
+        type=["csv"],
+        key="archive"
+    )
+
+    st.caption(
+        "Download the archive after each reporting period "
+        "and upload it again next month."
+    )
 
 
-# --------------------------------------------------
-# LOAD DATA
-# --------------------------------------------------
-summary = read_csv(summary_file)
-detail = read_csv(detail_file)
-group = read_csv(group_file)
-recommendations = read_csv(recommendation_file)
+# ==================================================
+# HEADER AND COMPANY LOGO
+# ==================================================
 
-# --------------------------------------------------
-# HEADER
-# --------------------------------------------------
-left, right = st.columns([1, 5])
+logo_path = Path("AL-Bawani-logo.png")
+
+left, right = st.columns([1.4, 5])
 
 with left:
-    if logo_file:
-        st.image(logo_file, width=125)
+    if logo_path.exists():
+        st.image(
+            str(logo_path),
+            use_container_width=True
+        )
     else:
         st.markdown(
-            f"<h2 style='color:{GREEN};margin-top:12px;'>AL BAWANI</h2>",
+            f"<h2 style='color:{GREEN}'>AL BAWANI</h2>",
             unsafe_allow_html=True
         )
 
 with right:
-    st.markdown(
-        """
-        <div style="padding-top:8px;">
-            <div style="font-size:12px;color:#7C8981;
-            letter-spacing:2px;font-weight:700;">
-                PEOPLE DEVELOPMENT
-            </div>
-            <div style="font-size:25px;font-weight:800;color:#17452F;">
-                Learning & Development Dashboard
-            </div>
-            <div style="color:#829087;font-size:13px;">
-                Employee learning performance and course tracking
-            </div>
+    st.markdown("""
+    <div style="padding-top:8px;">
+        <div style="font-size:11px;color:#7A8980;
+        letter-spacing:2px;font-weight:800;">
+            PEOPLE DEVELOPMENT
         </div>
-        """,
-        unsafe_allow_html=True
-    )
 
-st.markdown("<br>", unsafe_allow_html=True)
+        <div style="font-size:26px;font-weight:800;
+        color:#17452F;">
+            Learning & Development Dashboard
+        </div>
 
-st.markdown(
-    """
-    <div class="hero">
-        <h1>Build Skills. Grow Together.</h1>
-        <p>
-        Monitor employee learning journeys, mandatory training
-        and professional development in one place.
-        </p>
+        <div style="font-size:13px;color:#829087;">
+            Employee Learning Performance & Training Tracking
+        </div>
     </div>
-    """,
-    unsafe_allow_html=True
-)
+    """, unsafe_allow_html=True)
 
-# --------------------------------------------------
-# EMPTY STATE
-# --------------------------------------------------
-if summary is None or detail is None:
 
-    st.markdown("### Welcome to Learning Hub")
+st.markdown("""
+<div class="hero">
+    <h1>Build Skills. Grow Together.</h1>
+    <p>
+        Monitor employee learning journeys,
+        mandatory training and professional development.
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ==================================================
+# LOAD FILES
+# ==================================================
+
+summary_raw = read_report(summary_file)
+detail_raw = read_report(detail_file)
+group_data = read_report(group_file)
+recommendation_data = read_report(recommendation_file)
+
+if summary_raw is None or detail_raw is None:
 
     st.info(
-        "Upload the Learner Summary and Learner Detail CSV reports "
-        "using the Data Center in the sidebar to activate analytics."
+        "Upload Learner Summary and Learner Detail "
+        "to activate the dashboard."
     )
 
-    c1, c2, c3 = st.columns(3)
+    a, b, c = st.columns(3)
 
-    c1.markdown(
-        '<div class="info-card"><h3>01</h3>'
-        '<b>Employee Insights</b><p>Track learning activity.</p></div>',
-        unsafe_allow_html=True
-    )
+    a.info("Employee Insights\n\nTrack employee activity.")
 
-    c2.markdown(
-        '<div class="info-card"><h3>02</h3>'
-        '<b>Course Progress</b><p>Monitor course completion.</p></div>',
-        unsafe_allow_html=True
-    )
+    b.info("Course Progress\n\nMonitor course completion.")
 
-    c3.markdown(
-        '<div class="info-card"><h3>03</h3>'
-        '<b>Performance</b><p>Review learning outcomes.</p></div>',
-        unsafe_allow_html=True
-    )
+    c.info("Learning Analytics\n\nReview training performance.")
 
     st.stop()
 
 
-# --------------------------------------------------
-# DATA PREPARATION
-# --------------------------------------------------
-summary = summary.copy()
-detail = prepare_detail(detail)
+try:
+    summary = prepare_summary(summary_raw)
+    detail = prepare_detail(detail_raw)
 
-if "Hours Viewed" in summary.columns:
-    summary["Learning Hours"] = (
-        summary["Hours Viewed"].apply(duration_to_hours)
-    )
-else:
-    summary["Learning Hours"] = 0
+except ValueError as error:
+    st.error(str(error))
+    st.stop()
 
-for col in [
-    "Course Views",
-    "Course Completions",
-    "Days Logged In"
-]:
-    if col not in summary.columns:
-        summary[col] = 0
-    summary[col] = pd.to_numeric(
-        summary[col], errors="coerce"
-    ).fillna(0)
 
-if "department" not in summary.columns:
-    summary["department"] = "Not Specified"
+# Match course details to employees in the summary.
+employee_emails = set(summary["Email"])
 
-if "Name" not in summary.columns:
-    summary["Name"] = "Unknown"
+detail = detail[
+    detail["Email"].isin(employee_emails)
+].copy()
 
-if "Email" not in summary.columns:
-    summary["Email"] = summary["Name"]
 
-if "Content Name" not in detail.columns:
-    detail["Content Name"] = "Unknown Course"
-
-if "Email" not in detail.columns:
-    detail["Email"] = ""
-
-if "Name" not in detail.columns:
-    detail["Name"] = "Unknown"
-
-# --------------------------------------------------
+# ==================================================
 # FILTERS
-# --------------------------------------------------
-st.markdown('<div class="section-title">Learning Overview</div>',
-            unsafe_allow_html=True)
+# ==================================================
 
-f1, f2 = st.columns([1, 1])
-
-departments = sorted(
-    summary["department"].dropna().astype(str).unique().tolist()
+st.markdown(
+    '<div class="section-title">Dashboard Filters</div>',
+    unsafe_allow_html=True
 )
 
-with f1:
+col1, col2 = st.columns(2)
+
+departments = sorted(
+    summary["Department"].dropna().unique().tolist()
+)
+
+with col1:
     selected_department = st.selectbox(
         "Department",
         ["All Departments"] + departments
     )
 
-with f2:
-    search_name = st.text_input(
+with col2:
+    employee_search = st.text_input(
         "Search Employee",
-        placeholder="Enter employee name or email"
+        placeholder="Name or email"
     )
 
-filtered = summary.copy()
+
+filtered_summary = summary.copy()
 
 if selected_department != "All Departments":
-    filtered = filtered[
-        filtered["department"].astype(str) == selected_department
+    filtered_summary = filtered_summary[
+        filtered_summary["Department"] == selected_department
     ]
 
-if search_name:
-    filtered = filtered[
-        filtered["Name"].astype(str).str.contains(
-            search_name, case=False, na=False
+if employee_search:
+    filtered_summary = filtered_summary[
+        filtered_summary["Name"].str.contains(
+            employee_search,
+            case=False,
+            na=False
         )
-        | filtered["Email"].astype(str).str.contains(
-            search_name, case=False, na=False
+        |
+        filtered_summary["Email"].str.contains(
+            employee_search,
+            case=False,
+            na=False
         )
     ]
 
-emails = filtered["Email"].astype(str).tolist()
+
+filtered_emails = set(filtered_summary["Email"])
+
 filtered_detail = detail[
-    detail["Email"].astype(str).isin(emails)
+    detail["Email"].isin(filtered_emails)
 ].copy()
 
-# --------------------------------------------------
+
+# ==================================================
 # KPI CARDS
-# --------------------------------------------------
-total_employees = filtered["Email"].nunique()
-total_views = int(filtered["Course Views"].sum())
-total_completions = int(filtered["Course Completions"].sum())
-total_hours = filtered["Learning Hours"].sum()
+# ==================================================
+
+st.markdown(
+    '<div class="section-title">Learning Overview</div>',
+    unsafe_allow_html=True
+)
+
+total_employees = filtered_summary["Email"].nunique()
+
+total_views = int(
+    filtered_summary["Course Views"].sum()
+)
+
+total_completions = int(
+    filtered_summary["Course Completions"].sum()
+)
+
+total_hours = float(
+    filtered_summary["Learning Hours"].sum()
+)
 
 k1, k2, k3, k4 = st.columns(4)
 
-with k1:
-    metric_card("Total Employees", f"{total_employees:,}")
+k1.metric("Total Employees", f"{total_employees:,}")
+k2.metric("Course Views", f"{total_views:,}")
+k3.metric("Course Completions", f"{total_completions:,}")
+k4.metric("Learning Hours", f"{total_hours:,.1f} h")
 
-with k2:
-    metric_card("Course Views", f"{total_views:,}")
 
-with k3:
-    metric_card("Course Completions", f"{total_completions:,}")
+# ==================================================
+# DASHBOARD TABS
+# ==================================================
 
-with k4:
-    metric_card("Learning Hours", f"{total_hours:,.1f} h")
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# --------------------------------------------------
-# TABS
-# --------------------------------------------------
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Overview",
     "Employee Tracking",
     "Course Analytics",
-    "Mandatory Program"
+    "Mandatory Program",
+    "Monthly History"
 ])
 
-# --------------------------------------------------
+
+# ==================================================
 # TAB 1: OVERVIEW
-# --------------------------------------------------
+# ==================================================
+
 with tab1:
 
     st.markdown("### Learning Performance")
 
-    a, b = st.columns(2)
+    chart1, chart2 = st.columns(2)
 
-    with a:
-        dept_data = (
-            filtered.groupby("department", as_index=False)
-            ["Course Completions"].sum()
-            .sort_values("Course Completions", ascending=False)
+    with chart1:
+
+        department_data = (
+            filtered_summary.groupby(
+                "Department",
+                as_index=False
+            )
+            .agg(
+                Completions=("Course Completions", "sum")
+            )
+            .sort_values(
+                "Completions",
+                ascending=False
+            )
         )
 
         fig = px.bar(
-            dept_data,
-            x="department",
-            y="Course Completions",
+            department_data,
+            x="Department",
+            y="Completions",
             color_discrete_sequence=[GREEN],
             title="Course Completions by Department"
         )
@@ -516,71 +638,98 @@ with tab1:
         fig.update_layout(
             plot_bgcolor="white",
             paper_bgcolor="white",
-            margin=dict(l=10, r=10, t=55, b=10),
             xaxis_title="",
             yaxis_title="Completions"
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
 
-    with b:
-        status_counts = (
-            filtered_detail["Status"].value_counts()
+    with chart2:
+
+        status_data = (
+            filtered_detail["Status"]
+            .value_counts()
             .reindex(
                 ["Completed", "In Progress", "Not Started"],
                 fill_value=0
             )
-            .reset_index()
+            .rename_axis("Status")
+            .reset_index(name="Courses")
         )
 
-        status_counts.columns = ["Status", "Count"]
-
         fig = px.pie(
-            status_counts,
+            status_data,
             names="Status",
-            values="Count",
+            values="Courses",
             hole=0.65,
+            title="Course Status Distribution",
             color="Status",
             color_discrete_map={
                 "Completed": GREEN,
                 "In Progress": GOLD,
                 "Not Started": "#C9D3CD"
-            },
-            title="Course Activity Status"
+            }
         )
 
         fig.update_layout(
-            paper_bgcolor="white",
-            margin=dict(l=10, r=10, t=55, b=10),
-            legend_title=""
+            paper_bgcolor="white"
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
 
-    st.markdown("### Department Activity")
+    st.markdown("### Department Summary")
 
-    st.dataframe(
-        filtered.groupby("department", as_index=False).agg(
+    department_table = (
+        filtered_summary.groupby(
+            "Department",
+            as_index=False
+        )
+        .agg(
             Employees=("Email", "nunique"),
             Course_Views=("Course Views", "sum"),
             Completions=("Course Completions", "sum"),
             Learning_Hours=("Learning Hours", "sum")
-        ).round(1),
+        )
+    )
+
+    department_table["Learning_Hours"] = (
+        department_table["Learning_Hours"].round(1)
+    )
+
+    st.dataframe(
+        department_table,
         use_container_width=True,
         hide_index=True
     )
 
-# --------------------------------------------------
+    if group_data is not None and not group_data.empty:
+        st.markdown("### LinkedIn Group Summary")
+
+        st.dataframe(
+            group_data,
+            use_container_width=True,
+            hide_index=True
+        )
+
+
+# ==================================================
 # TAB 2: EMPLOYEE TRACKING
-# --------------------------------------------------
+# ==================================================
+
 with tab2:
 
     st.markdown("### Employee Directory")
 
-    employee_table = filtered[[
+    employee_table = filtered_summary[[
         "Name",
         "Email",
-        "department",
+        "Department",
         "Days Logged In",
         "Course Views",
         "Course Completions",
@@ -599,93 +748,131 @@ with tab2:
 
     st.markdown("### Employee Profile")
 
-    employee_options = filtered["Name"].dropna().unique().tolist()
+    employee_names = sorted(
+        filtered_summary["Name"].dropna().unique().tolist()
+    )
 
-    if employee_options:
+    if employee_names:
+
         selected_employee = st.selectbox(
             "Select Employee",
-            employee_options
+            employee_names
         )
 
-        employee_row = filtered[
-            filtered["Name"] == selected_employee
+        employee = filtered_summary[
+            filtered_summary["Name"] == selected_employee
         ].iloc[0]
 
-        employee_email = str(employee_row["Email"])
+        employee_email = employee["Email"]
 
-        employee_courses = detail[
-            detail["Email"].astype(str) == employee_email
+        employee_courses = filtered_detail[
+            filtered_detail["Email"] == employee_email
         ].copy()
 
         p1, p2, p3 = st.columns(3)
 
-        p1.metric("Course Views", int(employee_row["Course Views"]))
+        p1.metric(
+            "Course Views",
+            int(employee["Course Views"])
+        )
+
         p2.metric(
             "Completions",
-            int(employee_row["Course Completions"])
+            int(employee["Course Completions"])
         )
+
         p3.metric(
             "Learning Hours",
-            f"{employee_row['Learning Hours']:.1f} h"
+            f"{employee['Learning Hours']:.1f} h"
         )
 
-        st.write("**Department:**", employee_row["department"])
+        st.caption(
+            f"{employee_email} | {employee['Department']}"
+        )
 
         if not employee_courses.empty:
+
+            columns = [
+                "Content Name",
+                "Progress",
+                "Status"
+            ]
+
+            if "Completed At (PST/PDT)" in employee_courses.columns:
+                columns.append("Completed At (PST/PDT)")
+
             st.dataframe(
-                employee_courses[[
-                    "Content Name",
+                employee_courses[columns].sort_values(
                     "Progress",
-                    "Status"
-                ]].sort_values("Progress", ascending=False),
+                    ascending=False
+                ),
                 use_container_width=True,
                 hide_index=True
             )
-        else:
-            st.info("No course details found for this employee.")
 
-# --------------------------------------------------
+        else:
+            st.info("No course records found for this employee.")
+
+
+# ==================================================
 # TAB 3: COURSE ANALYTICS
-# --------------------------------------------------
+# ==================================================
+
 with tab3:
 
-    st.markdown("### Most Viewed Courses")
+    st.markdown("### Course Analytics")
 
     if not filtered_detail.empty:
 
-        course_data = (
-            filtered_detail.groupby("Content Name", as_index=False)
+        course_summary = (
+            filtered_detail.groupby(
+                "Content Name",
+                as_index=False
+            )
             .agg(
                 Learners=("Email", "nunique"),
                 Average_Progress=("Progress", "mean"),
-                Completed=("Status", lambda x: (x == "Completed").sum())
+                Completed=(
+                    "Status",
+                    lambda x: (x == "Completed").sum()
+                )
             )
-            .sort_values("Learners", ascending=False)
-            .head(15)
+            .sort_values(
+                "Learners",
+                ascending=False
+            )
+        )
+
+        top_courses = (
+            course_summary.head(15)
+            .sort_values("Learners")
         )
 
         fig = px.bar(
-            course_data.sort_values("Learners"),
+            top_courses,
             x="Learners",
             y="Content Name",
             orientation="h",
             color="Average_Progress",
-            color_continuous_scale=["#DCE9E0", GREEN],
+            color_continuous_scale=[
+                "#DCE9E0",
+                GREEN
+            ],
             title="Top 15 Courses by Learners"
         )
 
         fig.update_layout(
-            plot_bgcolor="white",
             paper_bgcolor="white",
-            margin=dict(l=10, r=10, t=55, b=10)
+            plot_bgcolor="white"
         )
 
-        st.plotly_chart(fig, use_container_width=True)
-
-        st.markdown("### Course Details")
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
 
         st.dataframe(
-            course_data.round(1),
+            course_summary.round(1),
             use_container_width=True,
             hide_index=True
         )
@@ -693,101 +880,119 @@ with tab3:
     else:
         st.info("No course activity available.")
 
-# --------------------------------------------------
+    if recommendation_data is not None:
+
+        st.markdown("### Recommended Courses")
+
+        if recommendation_data.empty:
+            st.caption("No recommendation records in this report.")
+        else:
+            st.dataframe(
+                recommendation_data,
+                use_container_width=True,
+                hide_index=True
+            )
+
+
+# ==================================================
 # TAB 4: MANDATORY COURSES
-# --------------------------------------------------
+# ==================================================
+
 with tab4:
 
     st.markdown("### Mandatory Learning Program")
 
-    configured = [c for c in mandatory_courses if c]
+    configured_courses = [
+        course for course in mandatory_courses if course
+    ]
 
-    if not configured:
+    if not configured_courses:
 
         st.info(
-            "Mandatory course titles have not been configured yet. "
-            "Add the official course titles from the sidebar when available."
+            "Mandatory course titles are not configured yet. "
+            "Enter the official titles in the sidebar when available."
         )
 
     else:
 
-        if len(configured) < 3:
+        if len(configured_courses) < 3:
             st.warning(
-                "Only some mandatory courses are configured. "
-                "Add the remaining titles when available."
+                "Only some mandatory courses have been configured."
             )
 
-        mandatory_results = []
+        mandatory_rows = []
 
-        for _, emp in filtered.iterrows():
+        for _, employee in filtered_summary.iterrows():
 
-            emp_email = str(emp["Email"])
+            email = employee["Email"]
 
-            emp_data = detail[
-                detail["Email"].astype(str) == emp_email
+            employee_detail = detail[
+                detail["Email"] == email
             ]
 
-            result = {
-                "Employee": emp["Name"],
-                "Department": emp["department"]
+            row = {
+                "Employee": employee["Name"],
+                "Department": employee["Department"]
             }
 
             completed_count = 0
 
-            for i, course_name in enumerate(configured, start=1):
+            for i, course_title in enumerate(
+                configured_courses,
+                start=1
+            ):
 
-                matches = emp_data[
-                    emp_data["Content Name"].astype(str).str.strip().str.casefold()
-                    == course_name.casefold()
+                matches = employee_detail[
+                    employee_detail["Content Name"]
+                    .str.strip()
+                    .str.casefold()
+                    == course_title.casefold()
                 ]
 
                 if matches.empty:
-                    status = "Not Started"
                     progress = 0
                 else:
-                    progress = matches["Progress"].max()
+                    progress = float(
+                        matches["Progress"].max()
+                    )
 
-                    if progress >= 100:
-                        status = "Completed"
-                        completed_count += 1
-                    elif progress > 0:
-                        status = "In Progress"
-                    else:
-                        status = "Not Started"
+                status = get_status(progress)
 
-                result[f"Course {i}"] = status
-                result[f"Progress {i}"] = progress
+                if status == "Completed":
+                    completed_count += 1
 
-            result["Completed Mandatory Courses"] = completed_count
-            result["Program Progress"] = (
-                completed_count / len(configured) * 100
+                row[f"Course {i}"] = status
+                row[f"Progress {i}"] = progress
+
+            row["Completed Courses"] = completed_count
+
+            row["Program Progress"] = (
+                completed_count / len(configured_courses) * 100
             )
 
-            mandatory_results.append(result)
+            mandatory_rows.append(row)
 
-        mandatory_df = pd.DataFrame(mandatory_results)
+        mandatory_df = pd.DataFrame(mandatory_rows)
 
-        st.markdown("#### Mandatory Course Progress")
-
-        for i, course_name in enumerate(configured, start=1):
-
-            progress_col = f"Progress {i}"
-            completed_col = f"Course {i}"
+        for i, course_title in enumerate(
+            configured_courses,
+            start=1
+        ):
 
             completed = (
-                mandatory_df[completed_col] == "Completed"
+                mandatory_df[f"Course {i}"] == "Completed"
             ).sum()
 
             total = len(mandatory_df)
 
-            st.markdown(f"**{course_name}**")
+            st.markdown(f"**{course_title}**")
 
             st.progress(
                 completed / total if total else 0,
                 text=f"{completed} of {total} employees completed"
             )
 
-        st.markdown("#### Employee Mandatory Status")
+        st.markdown("### Employee Completion Matrix")
 
         st.dataframe(
             mandatory_df,
@@ -797,23 +1002,222 @@ with tab4:
 
         st.download_button(
             "Download Mandatory Tracking",
-            mandatory_df.to_csv(index=False).encode("utf-8-sig"),
-            file_name="mandatory_learning_tracking.csv",
+            csv_download(mandatory_df),
+            file_name="al_bawani_mandatory_tracking.csv",
             mime="text/csv"
         )
 
-# --------------------------------------------------
+
+# ==================================================
+# TAB 5: MONTHLY HISTORY
+# ==================================================
+
+with tab5:
+
+    st.markdown("### Monthly Learning History")
+
+    st.caption(
+        "Download the archive after each reporting period. "
+        "Upload it again next month to continue tracking."
+    )
+
+    current_history = detail.copy()
+
+    current_history["Period"] = (
+        period or date.today().strftime("%b %Y")
+    )
+
+    current_history["Department"] = (
+        current_history["Email"].map(
+            summary.set_index("Email")["Department"].to_dict()
+        ).fillna("Not Specified")
+    )
+
+    current_history = current_history.rename(
+        columns={"Content Name": "Course Name"}
+    )
+
+    history_columns = [
+        "Period",
+        "Email",
+        "Name",
+        "Department",
+        "Course Key",
+        "Course Name",
+        "Progress",
+        "Status"
+    ]
+
+    current_history = current_history[history_columns]
+
+    if archive_file is not None:
+
+        try:
+            old_history = pd.read_csv(archive_file)
+
+        except Exception as error:
+            st.error(f"Could not read archive: {error}")
+            old_history = pd.DataFrame(
+                columns=history_columns
+            )
+
+    else:
+        old_history = pd.DataFrame(
+            columns=history_columns
+        )
+
+    for column in history_columns:
+        if column not in old_history.columns:
+            old_history[column] = ""
+
+    old_history = old_history[history_columns]
+
+    combined_history = pd.concat(
+        [old_history, current_history],
+        ignore_index=True
+    )
+
+    combined_history["Period"] = (
+        combined_history["Period"].astype(str)
+    )
+
+    combined_history["Email"] = (
+        combined_history["Email"].astype(str).str.lower()
+    )
+
+    combined_history["Course Key"] = (
+        combined_history["Course Key"].astype(str)
+    )
+
+    combined_history = combined_history.drop_duplicates(
+        subset=["Period", "Email", "Course Key"],
+        keep="last"
+    )
+
+    st.metric(
+        "Historical Course Records",
+        f"{len(combined_history):,}"
+    )
+
+    if not combined_history.empty:
+
+        period_summary = (
+            combined_history.groupby(
+                "Period",
+                as_index=False
+            )
+            .agg(
+                Employees=("Email", "nunique"),
+                Course_Records=("Course Key", "count"),
+                Completed=(
+                    "Status",
+                    lambda x: (x == "Completed").sum()
+                ),
+                Average_Progress=("Progress", "mean")
+            )
+        )
+
+        period_summary["Average_Progress"] = (
+            period_summary["Average_Progress"].round(1)
+        )
+
+        st.markdown("### Period Comparison")
+
+        st.dataframe(
+            period_summary,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        periods = combined_history["Period"].unique().tolist()
+
+        if len(periods) >= 2:
+
+            trend = (
+                combined_history.groupby(
+                    "Period",
+                    as_index=False
+                )
+                .agg(
+                    Completed=(
+                        "Status",
+                        lambda x: (x == "Completed").sum()
+                    )
+                )
+            )
+
+            fig = px.line(
+                trend,
+                x="Period",
+                y="Completed",
+                markers=True,
+                title="Completed Courses by Period",
+                color_discrete_sequence=[GREEN]
+            )
+
+            fig.update_layout(
+                paper_bgcolor="white",
+                plot_bgcolor="white"
+            )
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True
+            )
+
+        st.markdown("### Employee History")
+
+        employee_options = sorted(
+            combined_history["Name"].dropna().astype(str).unique()
+        )
+
+        selected_history_employee = st.selectbox(
+            "Select Employee",
+            ["All Employees"] + employee_options,
+            key="history_employee"
+        )
+
+        history_view = combined_history.copy()
+
+        if selected_history_employee != "All Employees":
+            history_view = history_view[
+                history_view["Name"] == selected_history_employee
+            ]
+
+        st.dataframe(
+            history_view.sort_values(
+                ["Period", "Name", "Course Name"]
+            ),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.download_button(
+            "Download / Update Historical Archive",
+            csv_download(combined_history),
+            file_name="al_bawani_learning_history_archive.csv",
+            mime="text/csv"
+        )
+
+    else:
+        st.info("No historical records available yet.")
+
+
+# ==================================================
 # FOOTER
-# --------------------------------------------------
-st.markdown("---")
+# ==================================================
+
+st.divider()
 
 st.markdown(
     """
-    <div style="text-align:center;color:#89958E;font-size:12px;padding:10px;">
+    <div style="text-align:center;color:#89958E;
+    font-size:11px;padding:10px;">
         AL BAWANI | LEARNING & DEVELOPMENT
         <br>
-        Employee Learning Intelligence
+        EMPLOYEE LEARNING TRACKER
     </div>
     """,
     unsafe_allow_html=True
 )
+
