@@ -1,128 +1,96 @@
-        f"{len(combined_history):,}"
-    )
 
-    if not combined_history.empty:
 
-        period_summary = (
-            combined_history.groupby(
-                "Period",
-                as_index=False
-            )
-            .agg(
-                Employees=("Email", "nunique"),
-                Course_Records=("Course Key", "count"),
-                Completed=(
-                    "Status",
-                    lambda x: (x == "Completed").sum()
-                ),
-                Average_Progress=("Progress", "mean")
-            )
-        )
+import io
+from pathlib import Path
+from datetime import date
 
-        period_summary["Average_Progress"] = (
-            pd.to_numeric(
-                period_summary["Average_Progress"],
-                errors="coerce"
-            ).round(1)
-        )
-
-        st.markdown("### Period Comparison")
-
-        st.dataframe(
-            period_summary,
-            use_container_width=True,
-            hide_index=True
-        )
-
-        periods = combined_history["Period"].unique().tolist()
-
-        if len(periods) >= 2:
-
-            trend = (
-                combined_history.groupby(
-                    "Period",
-                    as_index=False
-                )
-                .agg(
-                    Completed=(
-                        "Status",
-                        lambda x: (x == "Completed").sum()
-                    )
-                )
-            )
-
-            fig = px.line(
-                trend,
-                x="Period",
-                y="Completed",
-                markers=True,
-                title="Completed Courses by Period",
-                color_discrete_sequence=[GREEN]
-            )
-
-            fig.update_layout(
-                paper_bgcolor="white",
-                plot_bgcolor="white"
-            )
-
-            st.plotly_chart(
-                fig,
-                use_container_width=True
-            )
-
-        st.markdown("### Employee History")
-
-        employee_options = sorted(
-            combined_history["Name"]
-            .dropna()
-            .astype(str)
-            .unique()
-        )
-
-        selected_history_employee = st.selectbox(
-            "Select Employee",
-            ["All Employees"] + employee_options,
-            key="history_employee"
-        )
-
-        history_view = combined_history.copy()
-
-        if selected_history_employee != "All Employees":
-            history_view = history_view[
-                history_view["Name"] == selected_history_employee
-            ]
-
-        st.dataframe(
-            history_view.sort_values(
-                ["Period", "Name", "Course Name"]
-            ),
-            use_container_width=True,
-            hide_index=True
-        )
-
-        st.download_button(
-            "Download / Update Historical Archive",
-            csv_download(combined_history),
-            file_name="al_bawani_learning_history_archive.csv",
-            mime="text/csv"
-        )
-
-    else:
-        st.info("No historical records available yet.")
-
+import pandas as pd
+import plotly.express as px
+import streamlit as st
 
 # ==================================================
-# FOOTER
+# AL BAWANI | LEARNING & DEVELOPMENT
 # ==================================================
 
-st.divider()
+st.set_page_config(
+    page_title="Al Bawani | Learning Hub",
+    page_icon="📚",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.markdown(
-    """
-    <div style="text-align:center;color:#89958E;
-    font-size:11px;padding:10px;">
-        AL BAWANI | LEARNING & DEVELOPMENT
-        <br>
-        EMPLOYEE LEARNING TRACKER
-    </div>
-    """,
+GREEN = "#08783E"
+DARK_GREEN = "#075B32"
+GOLD = "#C6A45B"
+
+# ==================================================
+# CUSTOM DESIGN
+# ==================================================
+
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+.stApp {
+    background: #F4F7F5;
+    color: #20352A;
+}
+
+[data-testid="stSidebar"] {
+    background: white;
+    border-right: 1px solid #E4EBE6;
+}
+
+[data-testid="stMetric"] {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    border: 1px solid #E4ECE6;
+    box-shadow: 0 4px 16px rgba(20,60,40,.05);
+    transition: all .25s ease;
+}
+
+[data-testid="stMetric"]:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 9px 22px rgba(8,120,62,.12);
+}
+
+[data-testid="stMetricLabel"] {
+    color: #718078;
+    font-weight: 600;
+}
+
+[data-testid="stMetricValue"] {
+    color: #075B32;
+    font-weight: 800;
+}
+
+.hero {
+    background: linear-gradient(115deg,#064D2B,#08783E,#2A9B60);
+    padding: 34px;
+    border-radius: 20px;
+    color: white;
+    margin: 15px 0 25px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 28px rgba(8,120,62,.16);
+}
+
+.hero h1 {
+    color: white;
+    font-size: 30px;
+    font-weight: 800;
+    margin: 0;
+}
+
+.hero p {
+    color: #E5F3EA;
+    margin-top: 10px;
+}
+
+.section-title {
+    color: #17452F;
